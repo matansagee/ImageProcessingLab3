@@ -5,15 +5,8 @@ import android.graphics.Bitmap;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
-import org.opencv.core.MatOfPoint;
-import org.opencv.core.Point;
 
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
+import il.ac.tau.adviplab.myimageproc.MyImageProc;
 
 
 /**
@@ -38,8 +31,12 @@ public class CameraListener implements CameraBridgeViewBase.CvCameraViewListener
 
     //members
     private Mat mImToProcess;
+    private Mat mImageToWarp;
 
-
+    public void setImageToWarp(Bitmap bitmap){
+        mImageToWarp = new Mat();
+        Utils.bitmapToMat(bitmap, this.mImageToWarp);
+    }
     //Getters and setters
     //todo: add to tutorial
     public int getColorwMode() {
@@ -74,30 +71,22 @@ public class CameraListener implements CameraBridgeViewBase.CvCameraViewListener
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         switch (this.mColorMode) {
             case CameraListener.VIEW_MODE_RGBA:
-
                 mImToProcess = inputFrame.rgba();
-
                 break;
             case CameraListener.VIEW_MODE_GRAYSCALE:
                 mImToProcess = inputFrame.gray();
                 break;
-
         }
         switch (this.mViewMode) {
             case VIEW_MODE_DEFAULT:
                 break;
             case VIEW_MODE_START:
-
-                //Add your code here
-
-
+                mImToProcess = inputFrame.gray();
+                MyImageProc.detecetAndReplaceChessboard(mImToProcess, mImageToWarp);
                 break;
-
         }
-
         return mImToProcess;
     }
-
 };
 
 

@@ -191,6 +191,10 @@ public class TheMuseHomeActivity extends AppCompatActivity {
 
             case START_GROUP_ID:
                 //load a bitmap and pass it to cameraListener
+                Bitmap bitmap = BitmapFactory.decodeResource(getResources(),
+                        R.drawable.monalisa);
+                mCameraListener.setImageToWarp(bitmap);
+
                 mCameraListener.setViewMode(id);
 
         }
