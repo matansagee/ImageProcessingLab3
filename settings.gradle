@@ -1,2 +1,2 @@
-include ':app', ':myimageproc', ':MyImageProc'
+include ':app', ':myimageproc'
 include ':openCVLibrary2410'

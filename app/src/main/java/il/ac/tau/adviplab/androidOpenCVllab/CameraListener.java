@@ -81,7 +81,6 @@ public class CameraListener implements CameraBridgeViewBase.CvCameraViewListener
             case VIEW_MODE_DEFAULT:
                 break;
             case VIEW_MODE_START:
-                mImToProcess = inputFrame.gray();
                 MyImageProc.detecetAndReplaceChessboard(mImToProcess, mImageToWarp);
                 break;
         }
