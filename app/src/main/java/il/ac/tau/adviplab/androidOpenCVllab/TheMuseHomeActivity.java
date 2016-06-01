@@ -194,12 +194,8 @@ public class TheMuseHomeActivity extends AppCompatActivity {
                 Bitmap bitmap = BitmapFactory.decodeResource(getResources(),
                         R.drawable.monalisa);
                 mCameraListener.setImageToWarp(bitmap);
-
                 mCameraListener.setViewMode(id);
-
         }
-
-
         return super.onOptionsItemSelected(item);
     }
 

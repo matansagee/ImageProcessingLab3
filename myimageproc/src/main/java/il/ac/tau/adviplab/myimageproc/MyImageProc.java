@@ -6,11 +6,13 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfFloat;
 import org.opencv.core.MatOfInt;
 import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.utils.Converters;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -391,30 +393,44 @@ public class MyImageProc {
     }
 
     public static void detecetAndReplaceChessboard(Mat sourceImage, Mat replacementImage) {
-        int bwThresold = 100;
-        Mat sourceImageGrey = new Mat();
-        if (sourceImage.channels() >1){
-            Imgproc.cvtColor(sourceImage,sourceImageGrey,Imgproc.COLOR_RGBA2GRAY);
-        }
-        else{
-            sourceImageGrey=sourceImage.clone();
-        }
-        Mat bwImage = sourceImage.clone();
-        MyImageProc.im2BW(sourceImageGrey, bwImage, bwThresold, Imgproc.THRESH_BINARY_INV);
-        Mat eroded = bwImage.clone();
-        Mat dilate = bwImage.clone();
+        try {
+            int bwThresold = 100;
+            Mat sourceImageGrey = new Mat();
+            if (sourceImage.channels() > 1) {
+                Imgproc.cvtColor(sourceImage, sourceImageGrey, Imgproc.COLOR_RGBA2GRAY);
+            } else {
+                sourceImageGrey = sourceImage.clone();
+            }
+            Mat bwImage = sourceImage.clone();
+            MyImageProc.im2BW(sourceImageGrey, bwImage, bwThresold, Imgproc.THRESH_BINARY_INV);
+            Mat eroded = bwImage.clone();
+            Mat dilate = bwImage.clone();
 
-        imErode(bwImage, eroded, new Size(5, 5));
-        imDilate(bwImage, dilate, new Size(5, 5));
+            imDilate(bwImage, dilate, new Size(5, 5));
+            imErode(bwImage, eroded, new Size(5, 5));
 
-        List<MatOfPoint> contours = fincContours(dilate);
+            List<MatOfPoint> contours = fincContours(dilate);
 
-        List<MatOfPoint> convHull = findClutterOfConnectedComponents(eroded, contours, 29, 35);
-        int numOfContours = convHull.size();
+            List<MatOfPoint> convHull = findClutterOfConnectedComponents(eroded, contours, 27, 34);
+            int numOfContours = convHull.size();
 
-        for (int idx = 0; idx < numOfContours; idx++) {
-            Scalar color = new Scalar(255,0,0);
-            Imgproc.drawContours(sourceImage, convHull, idx, color, 2);
+            for (int idx = 0; idx < numOfContours; idx++) {
+                Scalar color = new Scalar(255, 0, 0);
+                Imgproc.drawContours(sourceImage, convHull, idx, color, 3);
+            }
+
+            List<Point> listOfPointsOnApproxCurve = approxCurve(sourceImageGrey, convHull, false);
+
+            try {
+                if (listOfPointsOnApproxCurve.size() == 4) {
+                    sortPoints(listOfPointsOnApproxCurve, sourceImage, true);
+                    placeROIwithAnotherImage(sourceImage, replacementImage, listOfPointsOnApproxCurve);
+                }
+            } catch (Exception e) {
+                System.out.println("Error: " + e.getMessage());
+            }
+        }catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
 
@@ -497,8 +513,98 @@ public class MyImageProc {
         hullMatOfint.release();
     }
 
+    public static List<Point> approxCurve(Mat sourceImage ,List<MatOfPoint>
+            pointsOnCurveList, boolean drawFlag)
+    {
+        MatOfPoint2f hullOfChessBoard2f = new MatOfPoint2f(pointsOnCurveList.get(0).toArray());
+        MatOfPoint2f approxCurve = new MatOfPoint2f();
+        List<MatOfPoint> approxCurveList = new ArrayList<>();
+        List<Point> listOfPointsOnApproxCurve = new ArrayList<>();
+        Imgproc.approxPolyDP(hullOfChessBoard2f, approxCurve,
+                Imgproc.arcLength(hullOfChessBoard2f, true) * 0.02, true);
+        approxCurveList.add(new MatOfPoint(approxCurve.toArray()));
+        if (drawFlag) {
+            Imgproc.drawContours(sourceImage, approxCurveList, 0, new
+                    Scalar(0, 255, 0), 2);
+        }
+        for (MatOfPoint matOfPoint : approxCurveList) {
+            listOfPointsOnApproxCurve = matOfPoint.toList();
+        }
+        return listOfPointsOnApproxCurve;
+    }
 
+    public static List<Point> sortPoints( List<Point> listOfPoints, Mat
+            image, boolean drawFlag) {
+            //todo: Add your implementation here
+        List<Point> sortedArray = new ArrayList<>();
+        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(0,0))));
+        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(0,image.height()))));
+        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(image.width(),image.height()))));
+        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(image.width(), 0))));
 
+        if (drawFlag){
+            Core.line(image,sortedArray.get(0),sortedArray.get(0),new Scalar(255,0,0),10);
+            Core.line(image,sortedArray.get(1),sortedArray.get(1),new Scalar(0,255,0),10);
+            Core.line(image,sortedArray.get(2),sortedArray.get(2),new Scalar(0,0,255),10);
+            Core.line(image, sortedArray.get(3), sortedArray.get(3), new Scalar(255, 255, 0),10);
+        }
+        return sortedArray;
+    }
 
+    public static int returnIndexOfMinDistance(List<Point> pointList, Point cornerPoint){
+        double minDistance = Integer.MAX_VALUE;
+        int idx=0;
+        for (int i = 0; i < pointList.size(); i++) {
+                Point point = pointList.get(i);
+                double distance = Math.pow(point.x-cornerPoint.x,2) + Math.pow(point.y-cornerPoint.y,2);
+                if ((distance) <minDistance){
+                    minDistance = distance;
+                    idx =i;
+                }
+            }
+        return idx;
+    }
+    public static void placeROIwithAnotherImage(Mat image, Mat
+            replacementImage, List<Point> boundaryPoints){
+        Mat intermediateMat = new Mat(image.size(),image.type());
+        List<Point> quadPoints = new ArrayList<>();
+        List<MatOfPoint> boundaryPointsListMatOfPoint = new ArrayList<>();
+        Mat transMtx = new Mat();
+            //converting a list of points to Mat
+        quadPoints = setQuadCorners(replacementImage);
+        Mat quadPointsMat = Converters.vector_Point2d_to_Mat(quadPoints);
+        Mat boundaryPointsMat =
+                Converters.vector_Point2d_to_Mat(boundaryPoints);
+        quadPointsMat.convertTo(quadPointsMat, CvType.CV_32FC2);
+        boundaryPointsMat.convertTo(boundaryPointsMat, CvType.CV_32FC2);
+        //getting the transformation matrix
+        transMtx
+                =Imgproc.getPerspectiveTransform(quadPointsMat,boundaryPointsMat);
+//Applying the warp and putting the result in intermediateMat
+        intermediateMat.setTo(new Scalar(0));
+        Imgproc.warpPerspective(replacementImage, intermediateMat,
+                transMtx, intermediateMat.size());
+//Replacing the chessboard with the warped image
+        MyImageProc.fillPoly(image, boundaryPoints, new Scalar(0));
+        Core.add(image,intermediateMat,image);
+        transMtx.release();
+    }
+
+    public static List<Point> setQuadCorners(Mat image) {
+        List<Point> quadPoints = new ArrayList<>();
+        quadPoints.add(new Point(0,0));
+        quadPoints.add(new Point(0,image.height()));
+        quadPoints.add(new Point(image.width(),image.height()));
+        quadPoints.add(new Point(image.width(), 0));
+        return quadPoints;
+    }
+    private static void fillPoly(Mat image, List<Point>
+            listOfPointsOnPolygon, Scalar scalar ){
+        List<MatOfPoint> listOfPointsMatOfPoints = new ArrayList<>();
+        MatOfPoint matOfPointsOnPolygon = new MatOfPoint();
+        matOfPointsOnPolygon.fromList(listOfPointsOnPolygon);
+        listOfPointsMatOfPoints.add(matOfPointsOnPolygon);
+        Core.fillPoly(image, listOfPointsMatOfPoints, scalar);
+    }
 
 }
