@@ -16,6 +16,8 @@ import org.opencv.utils.Converters;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -392,7 +394,7 @@ public class MyImageProc {
         displayFilter(imToDisplay, filteredImage, window);
     }
 
-    public static void detecetAndReplaceChessboard(Mat sourceImage, Mat replacementImage) {
+    public static List<Point> detecetAndReplaceChessboard(Mat sourceImage, Mat replacementImage, List<Point> previousBoundaryPoints) {
         try {
             int bwThresold = 100;
             Mat sourceImageGrey = new Mat();
@@ -414,24 +416,31 @@ public class MyImageProc {
             List<MatOfPoint> convHull = findClutterOfConnectedComponents(eroded, contours, 27, 34);
             int numOfContours = convHull.size();
 
-            for (int idx = 0; idx < numOfContours; idx++) {
-                Scalar color = new Scalar(255, 0, 0);
-                Imgproc.drawContours(sourceImage, convHull, idx, color, 3);
-            }
+//            for (int idx = 0; idx < numOfContours; idx++) {
+//                Scalar color = new Scalar(255, 0, 0);
+//                Imgproc.drawContours(sourceImage, convHull, idx, color, 3);
+//            }
 
             List<Point> listOfPointsOnApproxCurve = approxCurve(sourceImageGrey, convHull, false);
 
             try {
                 if (listOfPointsOnApproxCurve.size() == 4) {
-                    sortPoints(listOfPointsOnApproxCurve, sourceImage, true);
-                    placeROIwithAnotherImage(sourceImage, replacementImage, listOfPointsOnApproxCurve);
+                    previousBoundaryPoints = sortPoints(listOfPointsOnApproxCurve, sourceImage, false);
+                    placeROIwithAnotherImage(sourceImage, replacementImage, previousBoundaryPoints);
+
+                }else{
+                    placeROIwithAnotherImage(sourceImage, replacementImage, previousBoundaryPoints);
                 }
+
+
             } catch (Exception e) {
                 System.out.println("Error: " + e.getMessage());
             }
         }catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
         }
+
+        return previousBoundaryPoints;
     }
 
     public static void im2BW(Mat image, Mat bwImage, double threshold, int type) {
@@ -532,31 +541,96 @@ public class MyImageProc {
         }
         return listOfPointsOnApproxCurve;
     }
-
     public static List<Point> sortPoints( List<Point> listOfPoints, Mat
+            image, boolean drawFlag) {
+        ArrayList<Point> templistOfPoint = new ArrayList<>();
+        List<Point> sortedPoints = new ArrayList<>();
+
+        int i=0;
+        double center_x=0,center_y=0;
+        for (Point point:listOfPoints){
+            templistOfPoint.add(i,point);
+            i++;
+            center_x += point.x;
+            center_y += point.y;
+        }
+
+        center_x = 0.25*center_x;
+        center_y = 0.25*center_y;
+
+        double angle;
+        final ArrayList<Double> angles = new ArrayList<>();
+
+        Point point_1 = listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(0,0)));
+        double angle_1 = Math.atan2(point_1.y-center_y,point_1.x-center_x);
+
+        for (Point point:listOfPoints){
+            angle = Math.atan2(point.y-center_y,point.x-center_x)- angle_1;
+            if (angle<0)
+                angle += 2*Math.PI;
+            angles.add(angle);
+        }
+
+        final Integer[] indexArray =new Integer[angles.size()];
+        for (int k = 0; k < indexArray.length; k++) {
+            indexArray[k]=k;
+        }
+
+
+        Arrays.sort(indexArray, new Comparator<Integer>() {
+            @Override
+            public int compare(Integer lhs, Integer rhs) {
+                return angles.get(lhs).compareTo(angles.get(rhs));
+            }
+        });
+
+
+        sortedPoints.add(templistOfPoint.get(indexArray[0]));
+        sortedPoints.add(templistOfPoint.get(indexArray[3]));
+        sortedPoints.add(templistOfPoint.get(indexArray[2]));
+        sortedPoints.add(templistOfPoint.get(indexArray[1]));
+
+//        Collections.swap(sortedPoints, 0, 1);
+//        Collections.swap(sortedPoints,2,3);
+
+
+        if (drawFlag){
+            Core.line(image,sortedPoints.get(0),sortedPoints.get(0),new Scalar(255,0,0),10);
+            Core.line(image,sortedPoints.get(1),sortedPoints.get(1),new Scalar(0,255,0),10);
+            Core.line(image,sortedPoints.get(2),sortedPoints.get(2),new Scalar(0,0,255),10);
+            Core.line(image, sortedPoints.get(3), sortedPoints.get(3), new Scalar(255, 255, 0), 10);
+        }
+
+    return sortedPoints;
+    }
+
+    /*public static List<Point> sortPoints( List<Point> listOfPoints, Mat
             image, boolean drawFlag) {
             //todo: Add your implementation here
         List<Point> sortedArray = new ArrayList<>();
-        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(0,0))));
-        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(0,image.height()))));
-        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(image.width(),image.height()))));
-        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(image.width(), 0))));
+        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(0,0))));//R
+        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(0,image.height()-1))));//G
+        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints,new Point(image.width()-1,image.height()-1))));//B
+        sortedArray.add(listOfPoints.get(returnIndexOfMinDistance(listOfPoints, new Point(image.width() - 1, 0))));//Y
+        Collections.swap(sortedArray, 1, 3);
 
         if (drawFlag){
             Core.line(image,sortedArray.get(0),sortedArray.get(0),new Scalar(255,0,0),10);
             Core.line(image,sortedArray.get(1),sortedArray.get(1),new Scalar(0,255,0),10);
             Core.line(image,sortedArray.get(2),sortedArray.get(2),new Scalar(0,0,255),10);
-            Core.line(image, sortedArray.get(3), sortedArray.get(3), new Scalar(255, 255, 0),10);
+            Core.line(image, sortedArray.get(3), sortedArray.get(3), new Scalar(255, 255, 0), 10);
         }
         return sortedArray;
     }
-
+*/
     public static int returnIndexOfMinDistance(List<Point> pointList, Point cornerPoint){
         double minDistance = Integer.MAX_VALUE;
         int idx=0;
         for (int i = 0; i < pointList.size(); i++) {
                 Point point = pointList.get(i);
-                double distance = Math.pow(point.x-cornerPoint.x,2) + Math.pow(point.y-cornerPoint.y,2);
+                double dx = point.x - cornerPoint.x;
+                double dy = point.y - cornerPoint.y;
+            double distance = Math.sqrt(dx*dx + dy*dy);
                 if ((distance) <minDistance){
                     minDistance = distance;
                     idx =i;
@@ -593,9 +667,10 @@ public class MyImageProc {
     public static List<Point> setQuadCorners(Mat image) {
         List<Point> quadPoints = new ArrayList<>();
         quadPoints.add(new Point(0,0));
-        quadPoints.add(new Point(0,image.height()));
-        quadPoints.add(new Point(image.width(),image.height()));
-        quadPoints.add(new Point(image.width(), 0));
+        quadPoints.add(new Point(0,image.height()-1));
+        quadPoints.add(new Point(image.width() - 1, image.height() - 1));
+        quadPoints.add(new Point(image.width() - 1, 0));
+
         return quadPoints;
     }
     private static void fillPoly(Mat image, List<Point>
@@ -606,5 +681,6 @@ public class MyImageProc {
         listOfPointsMatOfPoints.add(matOfPointsOnPolygon);
         Core.fillPoly(image, listOfPointsMatOfPoints, scalar);
     }
+
 
 }

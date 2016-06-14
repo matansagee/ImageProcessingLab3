@@ -5,6 +5,9 @@ import android.graphics.Bitmap;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
+
+import java.util.List;
 
 import il.ac.tau.adviplab.myimageproc.MyImageProc;
 
@@ -32,6 +35,7 @@ public class CameraListener implements CameraBridgeViewBase.CvCameraViewListener
     //members
     private Mat mImToProcess;
     private Mat mImageToWarp;
+    private List<Point> mPreviousBoundaryPoints;
 
     public void setImageToWarp(Bitmap bitmap){
         mImageToWarp = new Mat();
@@ -81,7 +85,7 @@ public class CameraListener implements CameraBridgeViewBase.CvCameraViewListener
             case VIEW_MODE_DEFAULT:
                 break;
             case VIEW_MODE_START:
-                MyImageProc.detecetAndReplaceChessboard(mImToProcess, mImageToWarp);
+                mPreviousBoundaryPoints = MyImageProc.detecetAndReplaceChessboard(mImToProcess, mImageToWarp, mPreviousBoundaryPoints);
                 break;
         }
         return mImToProcess;
